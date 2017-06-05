@@ -1,0 +1,77 @@
+[kafka]
+kafka1 local_id=0 ansible_ssh_host=172.30.51.108 hostname=I-APIGW-KFK01
+kafka2 local_id=1 ansible_ssh_host=172.30.51.109 hostname=I-APIGW-KFK02
+kafka3 local_id=2 ansible_ssh_host=172.30.51.110 hostname=I-APIGW-KFK03
+
+[memcached]
+memcached1 ansible_ssh_host=172.30.51.106 hostname=I-APIGW-MEM01   
+memcached2 ansible_ssh_host=172.30.51.107 hostname=I-APIGW-MEM02   
+
+[asgard]
+asgard1 ansible_ssh_host=172.30.51.102 hostname=I-APIGW-ASGARD01  
+asgard2 ansible_ssh_host=172.30.51.103 hostname=I-APIGW-ASGARD02  
+
+[silvan]
+silvan1 ansible_ssh_host=172.30.51.100 hostname=I-APIGW-DB01
+silvan2 ansible_ssh_host=172.30.51.101 hostname=I-APIGW-DB02 
+
+[shubao:children]
+shubao_public
+shubao_pod
+shubao_tsz
+
+[shubao_public]
+public_shubao1  ansible_ssh_host=172.30.51.98 hostname=I-APIGW-SB01
+public_shubao2  ansible_ssh_host=172.30.51.99 hostname=I-APIGW-SB02
+public_shubao3  ansible_ssh_host=172.30.51.111 hostname=I-APIGW-SB03
+public_shubao4  ansible_ssh_host=172.30.51.112 hostname=I-APIGW-SB04
+
+[shubao_pod]
+#pod_shubao1  ansible_ssh_host=x.x.x.x  hostname=I-APIGW-SB05
+#pod_shubao2  ansible_ssh_host=x.x.x.x  hostname=I-APIGW-SB06
+
+[shubao_tsz]
+#shubao_go01 ansible_ssh_host=x.x.x.x hostname=I-APIGW-SBH01
+#shubao_go02 ansible_ssh_host=x.x.x.x hostname=I-APIGW-SBH02
+#shubao_go03 ansible_ssh_host=x.x.x.x hostname=I-APIGW-SBH03
+#shubao_go04 ansible_ssh_host=x.x.x.x hostname=I-APIGW-SBH04
+
+[shubao_nginx]
+lb01  ansible_ssh_host=172.30.51.113 hostname=I-APIGW-LB01 IS_PRIMARY=ha_primary 
+lb02  ansible_ssh_host=172.30.51.114 hostname=I-APIGW-LB02 IS_PRIMARY=ha_standby  
+
+[shubao_pod_nginx]
+lb03 ansible_ssh_host=172.30.51.115 hostname=I-APIGW-LB03  IS_PRIMARY=ha_primary      
+lb04 ansible_ssh_host=172.30.51.116 hostname=I-APIGW-LB04  IS_PRIMARY=ha_standby 
+
+[silvan_nginx]
+ngxs01  ansible_ssh_host=172.30.51.104 hostname=I-APIGW-NGXS01  IS_PRIMARY=ha_primary 
+ngxs02  ansible_ssh_host=172.30.51.105 hostname=I-APIGW-NGXS02  IS_PRIMARY=ha_standby 
+
+[nginx:children]
+silvan_nginx
+shubao_nginx
+shubao_pod_nginx
+
+[common_apigateway:children]
+kafka
+asgard
+shubao
+
+[common_onframework:children]
+silvan
+nginx
+memcached
+
+[ha_nginx_silvan:children]
+silvan_nginx
+
+[ha_nginx_shubao:children]
+shubao_nginx
+
+[ha_nginx_pod_shubao:children]
+shubao_pod_nginx
+
+[initsysuser:children]
+common_apigateway
+common_onframework
