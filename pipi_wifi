@@ -1,0 +1,198 @@
+
+Logo 写文章 注册 登录
+
+    首页
+    下载App
+
+树莓派Pi3设置wifi热点
+96
+作者 xaiolos
+2017.02.12 10:27* 字数 1401
+
+        年前换了部手机还是iphone的，但是几年过去了，google邮箱，digg reader的google账号没法直接登陆啦，捂脸。翻墙要越狱，想简单点拿台笔记本修改个hosts再开个热点就可以啦，郁闷的是用的macbook air没有有线插口开不了wifi热点，再捂脸。只能打起树莓派的注意。系统啥的就不说了，直接正题：
+一、安装hostapd和dnsmasq软件包
+
+天天干着linux上的路由系统，居然没接触到这两个软件，可见打杂功底至深，有空研究研究吧。照例先装着：
+
+    sudo apt-get install dnsmasq hostapd
+
+hostapd 是 Host Access Point 守护进程，提供对基于 Linux 的无线接入点的强 WPA2 加密和身份验证。配置 hostapd 非常简单，它支持 WPA2-Personal 和 Enterprise，提供了对 WPA2-Personal 的独特修改，可让管理它变得更复杂或更简单。
+
+dnsmasq是一个小巧且方便地用于配置DNS和DHCP的工具，适用于小型网络，它提供了DNS功能和可选择的DHCP功能。主用适用于NAT的家庭网络，用modem，cable modem，ADSL设备连接到因特网。
+二、接口配置
+
+将无线接口wlan0的IP配置成静态地址。以太网接口eth0默认DHCP配置并接入因特网。在树莓派系统中，默认是DHCPCD配置网络接口。所以要告诉系统我们给wlan0分配静态IP地址，操作是打开配置文件并增加配置参数指令。
+
+    sudo nano /etc/dhcpcd.conf
+
+    interface wlan0
+
+    static ip_address=192.168.0.1/24
+
+为了防止wpa_supplicant运行和干扰设定wlan0为接入点模式。需要打开接口配置文件，在wlan0段落中注释掉wpa-conf这行
+
+    sudo nano /etc/network/interfaces
+
+    allow-hotplug wlan0
+
+    iface wlan0 inet manual
+
+    #    wpa-conf /etc/wpa_supplicant/wpa_supplicant.conf
+
+执行完后还要重启dhcpcd服务，系统将会给wlan0接口分配一个静态IP，树莓派也需要重启，因为只有重启后才生效。
+
+    sudo service dhcpcd restart
+
+    sudo reboot
+
+三、 配置HOSTAPD
+
+创建一个新的文件配置HOSTAPD
+
+    sudo nano /etc/hostapd/hostapd.conf
+
+内容如下
+
+    interface=wlan0
+
+    driver=nl80211
+
+    ssid=pipi
+
+    hw_mode=g
+
+    channel=6
+
+    wmm_enabled=1
+
+    macaddr_acl=0
+
+    auth_algs=1
+
+    ignore_broadcast_ssid=0
+
+    wpa=2
+
+    wpa_passphrase=12345678
+
+    wpa_key_mgmt=WPA-PSK
+
+    rsn_pairwise=CCMP
+
+其中
+
+interface=wlan0，指定网卡名称为wlan0。
+
+wpa=2，采用WPA2加密方式。
+
+ssid=pipi为热点名称，可根据实际情况修改。
+
+wpa_passphrase=12345678为热点密码，可根据实际情况修改，如果采用WPA2加密方式，密码的长度应该不少于8个字符。
+
+接下来检查是否配置成功,如果出现AP-ENABLED并且客户端能搜索到SSID，表示AP模式已启用成功。如果有报错，说明驱动和hostapd配置没有正确设置。
+
+    sudo /usr/sbin/hostapd /etc/hostapd/hostapd.conf
+
+
+为了能让系统每次启动都自动加载AP模式下的配置，我们需要配置hostapd为自启动模式。打开默认配置文件，找到#DAEMON_CONF=””，将前面的#号去掉，
+
+    sudo nano /etc/default/hostapd
+
+    DAEMON_CONF="/etc/hostapd/hostapd.conf"
+
+手机测试连接ap正常。
+四、配置DNSMASQ
+
+为了实现上网功能，需要对DNSMASQ服务进行配置，首先备份一下系统默认的文件，然后创建一个新的配置文件。
+
+    sudo mv /etc/dnsmasq.conf/etc/bak_dnsmasq.conf
+
+    sudo nano /etc/dnsmasq.conf
+
+具体的配置信息如下所示：DNS请求服务器地址这里要配置成本地上网的DNS地址，否则可能解析错误。
+
+    interface=wlan0
+
+    bind-interfaces
+
+    server=218.2.2.2
+
+    server=114.114.114.114
+
+    server=8.8.8.8
+
+    domain-needed
+
+    bogus-priv
+
+    dhcp-range=192.168.1.2,192.168.1.254,12h
+
+五、设置IPV4转发
+
+打开系统配置文件sysctl.conf,将IPV4转发那一行的#去掉
+
+    sudo nano /etc/sysctl.conf
+
+    # Uncomment the next two lines toenable Spoof protection (reverse-path filter)
+
+    # Turn on Source AddressVerification in all interfaces to
+
+    # prevent some spoofing attacks
+
+    #net.ipv4.conf.default.rp_filter=1
+
+    #net.ipv4.conf.all.rp_filter=1
+
+    # Uncomment the next line toenable TCP/IP SYN cookies
+
+    # Note: This may impact IPv6 TCPsessions too
+
+    #net.ipv4.tcp_syncookies=1
+
+    # Uncomment the next line toenable packet forwarding for IPv4
+
+    net.ipv4.ip_forward=1
+
+下一次重启后会生效，如果不想现在重启，可以直接输入如下指令直接生效。
+
+    sudo sh -c "echo 1 >/proc/sys/net/ipv4/ip_forward"
+
+为了实现PI3以太网接口共享给wlan0上网，需要配置NAT，需先执行如下防火墙命令
+
+    sudo iptables -t nat -APOSTROUTING -o eth0 -j MASQUERADE
+
+    sudo iptables -A FORWARD -i eth0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+    sudo iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
+
+当然，为了不每次都手动配置，需要将以上规则设为自启动。
+
+    sudo sh -c "iptables-save> /etc/iptables.ipv4.nat"
+
+通过获取DHCPCD来运行NAT需要创建一个新文件
+
+    sudo nano/lib/dhcpcd/dhcpcd-hooks/70-ipv4-nat
+
+    iptables-restore</etc/iptables.ipv4.nat
+
+最后需要重启服务：
+
+    sudo service hostapdstart
+
+    sudo service dnsmasq start
+
+    sudo reboot
+
+当然树莓派还是要拿来连wifi上网，上述iptbales设为自启动还没有尝试，只是开机后下了三条iptables命令，测试OK啦。修改了linux下etc/hosts，手机连上登陆gmail，google账号一切正常。😄
+
+参考：
+
+PI3体验之无线网AP模式设定及热点分享
+
+http://bbs.elecfans.com/forum.php?mod=viewthread&tid=605803&extra=page=5&mobile=2
+树莓派
+© 著作权归作者所有
+举报文章
+96
+xaiolos
+更多分享
