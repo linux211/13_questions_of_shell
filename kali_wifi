@@ -1,0 +1,115 @@
+root@kali:~# cat /etc/network/interfaces
+auto lo
+iface lo inet loopback
+
+#auto eth0
+#iface eth0 inet static
+#address 192.168.1.32
+#netmask 255.255.255.0
+##gateway 192.168.1.1
+#
+auto wlan0
+iface wlan0 inet static
+address 192.168.1.1
+netmask 255.255.255.0
+#gateway 192.168.1.1
+
+auto dsl-provider
+iface dsl-provider inet ppp
+pre-up /bin/ip link set eth0 up # line maintained by pppoeconf
+provider dsl-provider
+#########################################################
+root@kali:~# cat /etc/hostapd/hostapd.conf 
+
+interface=wlan0
+
+driver=nl80211
+
+ssid=linux211
+
+hw_mode=g
+
+channel=6
+
+wmm_enabled=1
+
+macaddr_acl=0
+
+auth_algs=1
+
+ignore_broadcast_ssid=0
+
+wpa=2
+
+wpa_passphrase=Huawei@123
+
+wpa_key_mgmt=WPA-PSK
+
+rsn_pairwise=CCMP
+
+######################################################
+root@kali:~# cat /etc/dnsmasq.conf
+interface=wlan0
+
+bind-interfaces
+
+server=218.2.2.2
+
+server=114.114.114.114
+
+server=8.8.8.8
+
+domain-needed
+
+bogus-priv
+
+dhcp-range=192.168.1.2,192.168.1.254,12h
+
+###################################################
+root@kali:~# cat /etc/dhcp/dhcpd.conf 
+interface wlan0
+
+static ip_address=192.168.1.1/24
+
+root@kali:~# 
+##################################################
+root@kali:~# cat /etc/profile.d/hostapd.sh 
+#!/bin/bash
+sour_ifname=wlan0
+dest_ifname=ppp0
+#sudo iptables -t nat -APOSTROUTING -o $dest_ifname -j MASQUERADE
+#sudo iptables -A FORWARD -i $dest_ifname -o $sour_ifname -m state --state RELATED,ESTABLISHED -j ACCEPT
+#sudo iptables -A FORWARD -i $sour_ifname -o $dest_ifname -j ACCEPT
+
+#/usr/sbin/hostapd -d /etc/hostapd/hostapd.conf &
+#sleep 20
+#/etc/init.d/dnsmasq  start
+update-rc.d dnsmasq enable
+update-rc.d hostapd enable
+sudo iptables -t nat -APOSTROUTING -o ppp0 -j MASQUERADE
+sudo iptables -A FORWARD -i ppp0 -o wlan0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+sudo iptables -A FORWARD -i wlan0 -o ppp0 -j ACCEPT
+
+#sudo iptables -t nat -APOSTROUTING -o ppp0 -j MASQUERADE
+#sudo iptables -A FORWARD -i ppp0 -o wlan1 -m state --state RELATED,ESTABLISHED -j ACCEPT
+#sudo iptables -A FORWARD -i wlan1 -o ppp0 -j ACCEPT
+#mount -t cifs -o username=bWX178378,password=Dtsgx@267 //192.168.1.36/830 /mnt/cifs/
+root@kali:~# 
+#################################################
+root@kali:~# cat /etc/crontab 
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# m h dom mon dow user	command
+17 *	* * *	root    cd / && run-parts --report /etc/cron.hourly
+25 6	* * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
+47 6	* * 7	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
+52 6	1 * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
+#
+*/1 * * * * root iptables-restore /etc/iptables/rules.v4 
